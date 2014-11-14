@@ -67,8 +67,7 @@ def extractReviewFeatures(review):
 	features.append(review['stars'])
 	features.append(len(review['text']))
 	userFeatures = getUserFeatures(users, review['user_id'])
-	if userFeatures:
-		features.extend(userFeatures)
+	features.extend(userFeatures)
 	features.append(parseReviewDate(review['date']))
 	return features
 
