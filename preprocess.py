@@ -1,7 +1,9 @@
 from json import loads
+import pylab as pl
 import numpy as np
 import scipy
 from sklearn import preprocessing
+from sklearn import linear_model
 import datetime
 #not sure i did these imports right yet, lets see if i get a chance to test
 
@@ -93,17 +95,24 @@ with open(review_filename, 'r') as review_file:
   			trainingReviewActual.append(review['votes']['funny'] + review['votes']['useful'] + review['votes']['cool'])
   		n += 1
 
-print 'testReviews:'
-print testReviews
-print 'trainingReviews:'
-print trainingReviews
-print 'testReviewActual:'
-print testReviewActual
-print 'trainingReviewActual:'
-print trainingReviewActual 
+# print 'testReviews:'
+# print testReviews
+# print 'trainingReviews:'
+# print trainingReviews
+# print 'testReviewActual:'
+# print testReviewActual
+# print 'trainingReviewActual:'
+# print trainingReviewActual 
 
 test_design_matrix = np.array(testReviews)
 training_design_matrix = np.array(trainingReviews)
 
-print test_design_matrix
-print training_design_matrix
+test_outputs = np.array(testReviewActual)
+training_outputs = np.array(trainingReviewActual)
+
+# print test_design_matrix
+# print training_design_matrix
+
+
+clf = linear_model.LinearRegression()
+clf.fit(training_design_matrix, training_outputs)
