@@ -11,46 +11,72 @@ review_filename     = 'data/yelp_academic_dataset_review.json'
 tip_filename        = 'data/yelp_academic_dataset_tip.json'
 user_filename       = 'data/yelp_academic_dataset_user.json'
 
-testReviews = [] #a list of feature lists
-trainingReviews = [] #a list of feature lists
-testReviewActual = [] #list of integers
-trainingReviewActual = [] #list of integers
-users = {} #dict of userid:user object
+# List of lists of features
+testReviews = []
+# List of feature lists
+trainingReviews = []
+# List of integers
+testReviewActual = []
+# List of integers
+trainingReviewActual = []
+# Dict of userid:user object
+users = {}
 
-#im starting with lists because they are what I know, 
-#I figure later we can go through and convert each one into a numpy array
+# Starting with lists because they are what I know, 
+# I figure later we can go through and convert each one into a numpy array
 
-#get all the users
-with open(user_filename, 'r') as user_file:
-	for line in user_file:
-		user = (loads(line))
-		users[user['user_id']] = user
-
-#right now just gets the features in the review, not the text
-def extractReviewFeatures(review):
-	features = []
-	features.append(review['stars'])
-	features.append(len(review['text']))
-	userFeatures = getUserFeatures(review['user_id'])
-	if userFeatures:
-		for feature in userFeatures:
-			#annoying we have to unpack this but i did this "quick and dirty" lol 
-			features.append(feature)
-
+def parseReviewDate(date):
 	#get the date... a bit messy
-	dateList = review['date'].split('-')
+	dateList = date.split('-')
 	dateObj = datetime.datetime(int(dateList[0]), int(dateList[1]), int(dateList[2]))
-	epoch = datetime.datetime.utcfromtimestamp(1072915200) #so the number of seconds is smaller, we start from 2004 (yelp founding date)
-	deltaTime = dateObj - epoch
-	features.append(deltaTime.total_seconds())
+	#so the number of seconds is smaller, we start from 2004 (yelp founding date)
+	epoch = datetime.datetime.utcfromtimestamp(1072915200)
+	deltaTime = dateObj - epoch	
+	return deltaTime.total_seconds()
 
-#return list of more features
-def getUserFeatures(userId):
+def parseYelpingSinceDate(date):
+	dateList = date.split('-')
+	dateObj = datetime.datetime(int(dateList[0]), int(dateList[1]), 1)
+	epoch = datetime.datetime.utcfromtimestamp(1072915200)
+	deltaTime = dateObj - epoch	
+	return deltaTime.total_seconds()
+
+# Return list of more features
+def getUserFeatures(users, userId):
 	features = []
 	user = users[userId]
 	features.append(user['review_count'])
 	features.append(user['average_stars'])
 	features.append(user['votes']['useful'] + user['votes']['cool'] + user['votes']['funny'])
+	features.append(user['votes']['useful'])
+	features.append(user['votes']['cool'])
+	features.append(user['votes']['funny'])
+	features.append(parseYelpingSinceDate(user['yelping_since']))
+	# Number of friends
+	features.append(len(user['friends']))
+	# Compliment types listed on yelp site here: http://officialblog.yelp.com/2013/03/compliments-theyre-free-give-them.html
+	compliment_types = ["profile", "funny", "cute", "plain", "writer", "list", "note", "photos", "hot", "more", "cool"];
+	for compliment_type in compliment_types:
+		num_compliments = user['compliments'][compliment_type] if compliment_type in user['compliments'] else 0
+		features.append(num_compliments)
+	return features
+
+# Right now just gets the features in the review, not the text
+def extractReviewFeatures(review):
+	features = []
+	features.append(review['stars'])
+	features.append(len(review['text']))
+	userFeatures = getUserFeatures(users, review['user_id'])
+	if userFeatures:
+		features.extend(userFeatures)
+	features.append(parseReviewDate(review['date']))
+	return features
+
+# Get all the users
+with open(user_filename, 'r') as user_file:
+	for line in user_file:
+		user = (loads(line))
+		users[user['user_id']] = user
 
 numTrainingExamples = 500
 numTestExamples = 100
@@ -68,9 +94,11 @@ with open(review_filename, 'r') as review_file:
   			trainingReviewActual.append(review['votes']['funny'] + review['votes']['useful'] + review['votes']['cool'])
   		n += 1
 
-#SOMETHING IS NOT QUITE RIGHT WITH THIS. SORRY I HAD TO RUN. GOTTA DEBUG A LITTLE BIT I GUESS...
-
+print 'testReviews:'
 print testReviews
+print 'trainingReviews:'
 print trainingReviews
+print 'testReviewActual:'
 print testReviewActual
+print 'trainingReviewActual:'
 print trainingReviewActual 
