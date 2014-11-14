@@ -21,6 +21,8 @@ testReviewActual = []
 trainingReviewActual = []
 # Dict of userid:user object
 users = {}
+# Dict of businessid: business object
+businesses = {}
 
 # Starting with lists because they are what I know, 
 # I figure later we can go through and convert each one into a numpy array
@@ -40,6 +42,17 @@ def parseYelpingSinceDate(date):
 	epoch = datetime.datetime.utcfromtimestamp(1072915200)
 	deltaTime = dateObj - epoch	
 	return deltaTime.total_seconds()
+
+def getBusinessFeatures(businesses, businessId):
+	features = []
+	business = businesses[businessId]
+	features.append(business['stars'])
+	features.append(business['review_count'])
+	isOpen = 0
+	if business['open'] == True:
+		isOpen = 1
+	features.append(isOpen)
+	return features
 
 # Return list of more features
 def getUserFeatures(users, userId):
@@ -68,6 +81,8 @@ def extractReviewFeatures(review):
 	features.append(len(review['text']))
 	userFeatures = getUserFeatures(users, review['user_id'])
 	features.extend(userFeatures)
+	businessFeatures = getBusinessFeatures(businesses, review['business_id'])
+	features.extend(businessFeatures)
 	features.append(parseReviewDate(review['date']))
 	return features
 
@@ -76,6 +91,11 @@ with open(user_filename, 'r') as user_file:
 	for line in user_file:
 		user = (loads(line))
 		users[user['user_id']] = user
+#and the businesses
+with open(businesses_filename, 'r') as businesses_file:
+	for line in businesses_file:
+		business = (loads(line))
+		businesses[business['business_id']] = business
 
 numTrainingExamples = 500
 numTestExamples = 100
