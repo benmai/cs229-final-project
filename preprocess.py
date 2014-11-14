@@ -1,7 +1,7 @@
 from json import loads
-import numpy
+import numpy as np
 import scipy
-import sklearn
+from sklearn import preprocessing
 import datetime
 #not sure i did these imports right yet, lets see if i get a chance to test
 
@@ -121,3 +121,9 @@ print 'testReviewActual:'
 print testReviewActual
 print 'trainingReviewActual:'
 print trainingReviewActual 
+
+test_design_matrix = np.array(testReviews)
+training_design_matrix = np.array(trainingReviews)
+
+print test_design_matrix
+print training_design_matrix
