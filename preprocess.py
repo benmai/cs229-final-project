@@ -8,6 +8,8 @@ from sklearn import linear_model
 from sklearn import svm
 from sklearn.naive_bayes import GaussianNB
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics import recall_score
+from sklearn import cross_validation
 import datetime
 #not sure i did these imports right yet, lets see if i get a chance to test
 
@@ -117,8 +119,8 @@ with open(businesses_filename, 'r') as businesses_file:
 		business = (loads(line))
 		businesses[business['business_id']] = business
 
-numTrainingExamples = 1000000
-numTestExamples = 10000
+numTrainingExamples = 100000
+numTestExamples = 1000
 cutoff = 20
 
 with open(review_filename, 'r') as review_file:
@@ -190,14 +192,12 @@ even_test_outputs_classification = np.array(testReviewsEvenDistributionActualCla
 
 #bootstrapping
 numModels = 40
-bootstrapDatasetSize = 10000
+bootstrapDatasetSize = 1000
 totalTrainScore = 0
 totalTestScore = 0
 evenDistTestScore = 0
-avgWeight = []
-totalIntercept = 0
-for i in xrange(len(trainingReviews[0])):
-	avgWeight.append(0)
+recall = 0
+recallEqual = 0
 for i in xrange(numModels):
   	newModelSet = []
   	newModelSetActual = []
@@ -223,38 +223,40 @@ for i in xrange(numModels):
   				j += 1
   				usedNumbers[rand] = 1
   	scaler = preprocessing.StandardScaler().fit(np.array(newModelSet))
+
 	trainMatrix = scaler.transform(np.array(newModelSet))
 	trainOutput = np.array(newModelSetActual)
 	trainOutputClassification = np.array(newModelSetActualClassification)
+
 	temporaryTestset = scaler.transform(test_design_matrix)
 	temporaryEvenTestset = scaler.transform(even_test_design_matrix)
+	supportVecMachine = svm.SVC(tol=1e-2, max_iter=3000)
 	clf = linear_model.LogisticRegression()
-	modelTrainScore = clf.fit(trainMatrix, trainOutputClassification).score(trainMatrix, trainOutputClassification)
-	modelTestScore = clf.fit(trainMatrix, trainOutputClassification).score(temporaryTestset, test_outputs_classification)
-	modelEvenDistScore = clf.fit(trainMatrix, trainOutputClassification).score(temporaryEvenTestset, even_test_outputs_classification)
+	supportVecMachine.fit(trainMatrix, trainOutputClassification)
+	predictions = supportVecMachine.predict(temporaryTestset)
+	predictionsEqual = supportVecMachine.predict(temporaryEvenTestset)
+	evenDistPredictions = supportVecMachine.predict(temporaryEvenTestset)
+	recall += recall_score(test_outputs_classification, predictions,average=None)
+	recallEqual += recall_score(even_test_outputs_classification, predictionsEqual,average=None)
+	modelTrainScore = supportVecMachine.score(trainMatrix, trainOutputClassification)
+	modelTestScore = supportVecMachine.score(temporaryTestset, test_outputs_classification)
+	modelEvenDistScore = supportVecMachine.score(temporaryEvenTestset, even_test_outputs_classification)
+
 	totalTrainScore += modelTrainScore
 	totalTestScore += modelTestScore
 	evenDistTestScore += modelEvenDistScore
-	params = clf.coef_[0]
-	totalIntercept += clf.intercept_
-	print params
-	for k in xrange(len(params)):
-		avgWeight[k] += params[k]
 
-for i in xrange(len(avgWeight)):
-	avgWeight[i] = avgWeight[i]/numModels
-print "Avg parameter values are"
-print avgWeight
-clf = linear_model.LinearRegression()
-clf.coef_ = avgWeight
-clf.intercept_ = totalIntercept/numModels
-print "bootstrapped model with all the parameters averaged test score on even set"
-#print clf.score(even_test_design_matrix_scaled, even_test_outputs_classification)
-print "bootstrapped model with all parameters averaged test score on random set"
-#print clf.score(test_design_matrix_scaled, test_outputs_classification)
 print "Average training score is " + str(totalTrainScore/numModels)
 print "Average test score is " + str(totalTestScore/numModels)
 print "Average test score on even distribution is " + str(evenDistTestScore/numModels)
+print "True positive rate average on random data is: "
+print recall[1]/numModels
+print "True negative rate average on random data is: "
+print recall[0]/numModels
+print "True positive rate average on equal data is: "
+print recallEqual[1]/numModels
+print "True negative rate average on equal data is: "
+print recallEqual[0]/numModels
 
 print "Linear Regression training score"
 clf = linear_model.LinearRegression()
@@ -285,16 +287,14 @@ print naiveBayes.fit(training_design_matrix_scaled, training_outputs_classificat
 
 print "\nSVM (SVC) training scorez"
 supportVecMachine = svm.SVC(tol=1e-2, max_iter=3000)
-#print supportVecMachine.fit(training_design_matrix_scaled,training_outputs_classification).score(training_design_matrix_scaled, training_outputs_classification)
+print supportVecMachine.fit(training_design_matrix_scaled,training_outputs_classification).score(training_design_matrix_scaled, training_outputs_classification)
 
 print "\nSVM (SVC) test score"
-#print supportVecMachine.fit(training_design_matrix_scaled,training_outputs_classification).score(test_design_matrix_scaled, test_outputs_classification)
+print supportVecMachine.fit(training_design_matrix_scaled,training_outputs_classification).score(test_design_matrix_scaled, test_outputs_classification)
 print "\nSVM score on evenly distributed test"
-#print supportVecMachine.fit(training_design_matrix_scaled,training_outputs_classification).score(even_test_design_matrix_scaled, even_test_outputs_classification)
+print supportVecMachine.fit(training_design_matrix_scaled,training_outputs_classification).score(even_test_design_matrix_scaled, even_test_outputs_classification)
 #
 #TODO:
-#fix bootstrapping (whoops)
-#see what features are actually important
 #get the text features
 #try to get an idea of false positives vs false negatives, true positives and true negatives to gauge performance better
 #actually experiment with the data to see if what we're getting makes any sense
