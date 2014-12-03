@@ -76,10 +76,10 @@ def getUserFeatures(users, userId):
 	user = users[userId]
 	features.append(user['review_count'])
 	features.append(user['average_stars'])
-	features.append(user['votes']['useful'] + user['votes']['cool'] + user['votes']['funny'])
-	features.append(user['votes']['useful'])
-	features.append(user['votes']['cool'])
-	features.append(user['votes']['funny'])
+	#features.append(user['votes']['useful'] + user['votes']['cool'] + user['votes']['funny'])
+	#features.append(user['votes']['useful'])
+	#features.append(user['votes']['cool'])
+	#features.append(user['votes']['funny'])
 	features.append(parseYelpingSinceDate(user['yelping_since']))
 	# Number of friends
 	features.append(len(user['friends']))
@@ -101,7 +101,7 @@ def extractReviewFeatures(review):
 	businessFeatures = getBusinessFeatures(businesses, review['business_id'])
 	features.extend(businessFeatures)
 	features.append(parseReviewDate(review['date']))
-	features.append()
+	#features.append()
 	for i in xrange(len(features)):
 		features[i] = float(features[i])
 	return features
@@ -117,17 +117,9 @@ with open(businesses_filename, 'r') as businesses_file:
 		business = (loads(line))
 		businesses[business['business_id']] = business
 
-numTrainingExamples = 100000
-numTestExamples = 1000
+numTrainingExamples = 1000000
+numTestExamples = 10000
 cutoff = 20
-numAboveCutoff = 0
-with open(review_filename, 'r') as review_file:
-	for line in review_file:
-  		review = loads(line)
-  		numUpvotes = review['votes']['funny'] + review['votes']['useful'] + review['votes']['cool']
-  		if numUpvotes > cutoff:
-  			numAboveCutoff += 1
-print numAboveCutoff
 
 with open(review_filename, 'r') as review_file:
 	n = 0
@@ -198,10 +190,14 @@ even_test_outputs_classification = np.array(testReviewsEvenDistributionActualCla
 
 #bootstrapping
 numModels = 40
-bootstrapDatasetSize = 1000
+bootstrapDatasetSize = 10000
 totalTrainScore = 0
 totalTestScore = 0
 evenDistTestScore = 0
+avgWeight = []
+totalIntercept = 0
+for i in xrange(len(trainingReviews[0])):
+	avgWeight.append(0)
 for i in xrange(numModels):
   	newModelSet = []
   	newModelSetActual = []
@@ -232,11 +228,30 @@ for i in xrange(numModels):
 	trainOutputClassification = np.array(newModelSetActualClassification)
 	temporaryTestset = scaler.transform(test_design_matrix)
 	temporaryEvenTestset = scaler.transform(even_test_design_matrix)
-	clf = linear_model.LinearRegression()
-	totalTrainScore += clf.fit(trainMatrix, trainOutputClassification).score(trainMatrix, trainOutputClassification)
-	totalTestScore += clf.fit(trainMatrix, trainOutputClassification).score(temporaryTestset, test_outputs_classification)
-	evenDistTestScore += clf.fit(trainMatrix, trainOutputClassification).score(temporaryEvenTestset, even_test_outputs_classification)
+	clf = linear_model.LogisticRegression()
+	modelTrainScore = clf.fit(trainMatrix, trainOutputClassification).score(trainMatrix, trainOutputClassification)
+	modelTestScore = clf.fit(trainMatrix, trainOutputClassification).score(temporaryTestset, test_outputs_classification)
+	modelEvenDistScore = clf.fit(trainMatrix, trainOutputClassification).score(temporaryEvenTestset, even_test_outputs_classification)
+	totalTrainScore += modelTrainScore
+	totalTestScore += modelTestScore
+	evenDistTestScore += modelEvenDistScore
+	params = clf.coef_[0]
+	totalIntercept += clf.intercept_
+	print params
+	for k in xrange(len(params)):
+		avgWeight[k] += params[k]
 
+for i in xrange(len(avgWeight)):
+	avgWeight[i] = avgWeight[i]/numModels
+print "Avg parameter values are"
+print avgWeight
+clf = linear_model.LinearRegression()
+clf.coef_ = avgWeight
+clf.intercept_ = totalIntercept/numModels
+print "bootstrapped model with all the parameters averaged test score on even set"
+#print clf.score(even_test_design_matrix_scaled, even_test_outputs_classification)
+print "bootstrapped model with all parameters averaged test score on random set"
+#print clf.score(test_design_matrix_scaled, test_outputs_classification)
 print "Average training score is " + str(totalTrainScore/numModels)
 print "Average test score is " + str(totalTestScore/numModels)
 print "Average test score on even distribution is " + str(evenDistTestScore/numModels)
@@ -278,6 +293,8 @@ print "\nSVM score on evenly distributed test"
 #print supportVecMachine.fit(training_design_matrix_scaled,training_outputs_classification).score(even_test_design_matrix_scaled, even_test_outputs_classification)
 #
 #TODO:
-#new scoring method
+#fix bootstrapping (whoops)
+#see what features are actually important
 #get the text features
-#
+#try to get an idea of false positives vs false negatives, true positives and true negatives to gauge performance better
+#actually experiment with the data to see if what we're getting makes any sense
